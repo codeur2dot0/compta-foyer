@@ -1,0 +1,1938 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Comptabilité</title>
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F3F0E6; -webkit-tap-highlight-color: transparent; }
+  input, button { font-family: inherit; }
+  button { cursor: pointer; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* ---------------------------------- tokens ---------------------------------- */
+
+const C = {
+  ink: "#20291F",
+  inkSoft: "#3A4536",
+  paper: "#F3F0E6",
+  card: "#FBF9F3",
+  border: "#E2DCC9",
+  gold: "#A5772B",
+  income: "#3F6B4F",
+  expense: "#A34C36",
+  muted: "#8B8570",
+  person1: "#2E6B6B",
+  person2: "#6E4C78",
+  foyer: "#A5772B",
+  charges: "#8B5E3F",
+  epargne: "#3E6B8B",
+  dette: "#8B4B4B",
+  patrimoine: "#6E5E3F",
+};
+
+const FONTS = `
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+.gl-serif { font-family: 'Source Serif 4', Georgia, serif; }
+.gl-sans { font-family: 'IBM Plex Sans', -apple-system, sans-serif; }
+.gl-mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+.gl-scroll::-webkit-scrollbar { display: none; }
+`;
+
+/* ---------------------------------- icônes (remplacent lucide-react) ---------------------------------- */
+
+function Icon({ paths, size = 16, color = "currentColor", strokeWidth = 2 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {paths}
+    </svg>
+  );
+}
+const mkIcon = (paths) => (props) => <Icon paths={paths} {...props} />;
+
+const Home = mkIcon(<><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></>);
+const Plus = mkIcon(<><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>);
+const X = mkIcon(<><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></>);
+const ChevronLeft = mkIcon(<polyline points="15 6 9 12 15 18" />);
+const ChevronRight = mkIcon(<polyline points="9 6 15 12 9 18" />);
+const Settings = mkIcon(<><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.1.7.6 1.3 1.3 1.5.3.1.6.2.9.2H21a2 2 0 1 1 0 4h-.1c-.7 0-1.3.4-1.5 1z" /></>);
+const Trash2 = mkIcon(<><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>);
+const ShoppingCart = mkIcon(<><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" /></>);
+const Car = mkIcon(<path d="M3 17h1a2 2 0 0 0 4 0h8a2 2 0 0 0 4 0h1v-5l-2-5H5L3 12v5z" />);
+const Popcorn = mkIcon(<><path d="M6 8h12l-1.2 12.5a1 1 0 0 1-1 .9H8.2a1 1 0 0 1-1-.9L6 8z" /><path d="M6 8a2 2 0 1 1 4-1 2 2 0 1 1 4 0 2 2 0 1 1 4 1" /></>);
+const HeartPulse = mkIcon(<><path d="M20.8 4.6a5 5 0 0 0-7.1 0L12 6.3l-1.7-1.7a5 5 0 0 0-7.1 7.1L12 21l8.8-9.3a5 5 0 0 0 0-7.1z" /><polyline points="7 12 9.5 12 11 9 13 15 14.5 12 17 12" /></>);
+const ShoppingBag = mkIcon(<><path d="M6 2 3 7v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-3-5z" /><line x1="3" y1="7" x2="21" y2="7" /><path d="M9 11a3 3 0 0 0 6 0" /></>);
+const UtensilsCrossed = mkIcon(<><path d="M7 3v6a2 2 0 0 0 4 0V3" /><line x1="9" y1="9" x2="9" y2="21" /><path d="M17 3l-3 6 3 3v9" /></>);
+const Gift = mkIcon(<><rect x="3" y="8" width="18" height="4" /><path d="M12 8v13" /><path d="M19 12v9H5v-9" /><path d="M7.5 8a2.5 2.5 0 1 1 0-5C10 3 12 8 12 8" /><path d="M16.5 8a2.5 2.5 0 1 0 0-5C14 3 12 8 12 8" /></>);
+const RefreshCcw = mkIcon(<><polyline points="1 4 1 10 7 10" /><path d="M3.5 15a9 9 0 1 0 2.1-9.4L1 10" /></>);
+const Sparkles = mkIcon(<><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z" /><path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z" /></>);
+const MoreHorizontal = mkIcon(<><circle cx="5" cy="12" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="19" cy="12" r="1.4" /></>);
+const Wallet = mkIcon(<><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v3" /><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z" /><circle cx="17" cy="14" r="1.2" /></>);
+const Briefcase = mkIcon(<><rect x="2" y="7" width="20" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="2" y1="13" x2="22" y2="13" /></>);
+const PiggyBank = mkIcon(<><path d="M19 9a1 1 0 0 0 0-2h-1.2A5 5 0 0 0 13 4H9a5 5 0 0 0-5 5v2H2v3h2v2a2 2 0 0 0 2 2h1v2h3v-2h4v2h3v-2.3A5 5 0 0 0 19 12V9z" /><circle cx="16" cy="10" r=".8" /></>);
+const CalendarClock = mkIcon(<><rect x="3" y="5" width="18" height="16" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="8" y1="3" x2="8" y2="7" /><line x1="16" y1="3" x2="16" y2="7" /><circle cx="12" cy="15" r="3.2" /><line x1="12" y1="13.5" x2="12" y2="15" /><line x1="12" y1="15" x2="13.2" y2="15.6" /></>);
+const Check = mkIcon(<polyline points="4 12 9 17 20 6" />);
+const ArrowUpRight = mkIcon(<><line x1="6" y1="18" x2="18" y2="6" /><polyline points="8 6 18 6 18 16" /></>);
+const ArrowDownRight = mkIcon(<><line x1="6" y1="6" x2="18" y2="18" /><polyline points="18 8 18 18 8 18" /></>);
+const BarChart3 = mkIcon(<><line x1="4" y1="20" x2="4" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="20" y1="20" x2="20" y2="14" /></>);
+const Landmark = mkIcon(<><line x1="3" y1="21" x2="21" y2="21" /><line x1="5" y1="21" x2="5" y2="10" /><line x1="10" y1="21" x2="10" y2="10" /><line x1="14" y1="21" x2="14" y2="10" /><line x1="19" y1="21" x2="19" y2="10" /><polygon points="12 2 21 8 3 8" /></>);
+const Fuel = mkIcon(<><line x1="4" y1="21" x2="14" y2="21" /><line x1="7" y1="21" x2="7" y2="4" /><rect x="4" y="4" width="10" height="8" rx="1" /><path d="M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0v-6l-3-3" /></>);
+const Shield = mkIcon(<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" />);
+const Dumbbell = mkIcon(<><line x1="6" y1="12" x2="18" y2="12" /><rect x="2" y="9" width="3" height="6" rx="1" /><rect x="19" y="9" width="3" height="6" rx="1" /><rect x="5" y="7" width="2" height="10" rx="1" /><rect x="17" y="7" width="2" height="10" rx="1" /></>);
+const Gem = mkIcon(<><path d="M6 3h12l4 6-10 12L2 9z" /><path d="M2 9h20M9 3l3 6-3 12M15 3l-3 6 3 12" /></>);
+
+/* ---------------------------------- graphiques (remplacent recharts) ---------------------------------- */
+
+function ChartCanvas({ type, data, options }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+  const depKey = JSON.stringify(data) + "|" + JSON.stringify(options) + "|" + type;
+  useEffect(() => {
+    if (!canvasRef.current || typeof Chart === "undefined") return;
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new Chart(canvasRef.current.getContext("2d"), { type, data, options });
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depKey]);
+  return <canvas ref={canvasRef} />;
+}
+
+function chartOptions(currency) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label ? ctx.dataset.label + ": " : ""}${money(ctx.parsed.y, currency)}` } },
+    },
+    scales: {
+      x: { ticks: { font: { size: 9 }, color: C.muted }, grid: { display: false } },
+      y: { display: false },
+    },
+  };
+}
+
+function pieOptions(currency) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${money(ctx.parsed, currency)}` } },
+    },
+  };
+}
+
+const EXPENSE_CATEGORIES = [
+  { id: "essence", label: "Essence", icon: Fuel, color: "#B4622F", flowType: "depense" },
+  {
+    id: "transport", label: "Transport", icon: Car, color: "#8B6A45",
+    subcategories: [
+      { id: "transport_entretien", label: "Entretien/réparations", flowType: "depense" },
+      { id: "transport_peages", label: "Péages & parkings", flowType: "depense" },
+    ],
+  },
+  {
+    id: "banque", label: "Banque", icon: Landmark, color: "#5E6E8B",
+    subcategories: [
+      { id: "banque_cotisation", label: "Cotisation", flowType: "charge" },
+      { id: "banque_pret", label: "Prêt (remboursement)", flowType: "charge" },
+    ],
+  },
+  {
+    id: "assurances", label: "Assurances", icon: Shield, color: "#8B5E6E",
+    subcategories: [
+      { id: "assurances_habitation", label: "Habitation", flowType: "charge" },
+      { id: "assurances_auto", label: "Auto", flowType: "charge" },
+      { id: "assurances_pret", label: "Prêt", flowType: "charge" },
+      { id: "assurances_mutuelle", label: "Mutuelle (santé)", flowType: "charge" },
+    ],
+  },
+  {
+    id: "logement", label: "Logement", icon: Home, color: "#4E6C7C",
+    subcategories: [
+      { id: "logement_loyer", label: "Loyer/crédit", flowType: "charge" },
+      { id: "logement_energie", label: "Énergie", flowType: "charge" },
+      { id: "logement_eau", label: "Eau", flowType: "charge" },
+      { id: "logement_internet", label: "Internet/téléphone", flowType: "charge" },
+    ],
+  },
+  { id: "courses", label: "Courses", icon: ShoppingCart, color: "#6E7C4E", flowType: "depense" },
+  { id: "restaurant", label: "Restaurant", icon: UtensilsCrossed, color: "#B4573F", flowType: "depense" },
+  {
+    id: "sante", label: "Santé", icon: HeartPulse, color: "#A34C36",
+    subcategories: [
+      { id: "sante_pharmacie", label: "Pharmacie", flowType: "depense" },
+      { id: "sante_soins", label: "Soins", flowType: "depense" },
+    ],
+  },
+  {
+    id: "loisirs", label: "Loisirs", icon: Popcorn, color: "#83507C",
+    subcategories: [
+      { id: "loisirs_sorties", label: "Sorties", flowType: "depense" },
+      { id: "loisirs_streaming", label: "Streaming", flowType: "depense" },
+      { id: "loisirs_vacances", label: "Vacances/Voyages", flowType: "depense" },
+    ],
+  },
+  {
+    id: "shopping", label: "Shopping", icon: ShoppingBag, color: "#5C5C8B",
+    subcategories: [
+      { id: "shopping_vetements", label: "Vêtements", flowType: "depense" },
+      { id: "shopping_hightech", label: "High-tech/Électronique", flowType: "depense" },
+      { id: "shopping_maison", label: "Maison/Déco", flowType: "depense" },
+      { id: "shopping_autres", label: "Autres achats", flowType: "depense" },
+    ],
+  },
+  {
+    id: "sport", label: "Sport", icon: Dumbbell, color: "#4E8B5E",
+    subcategories: [
+      { id: "sport_abonnement", label: "Abonnement/salle", flowType: "charge" },
+      { id: "sport_equipement", label: "Équipement/matériel", flowType: "depense" },
+      { id: "sport_nutrition", label: "Nutrition", flowType: "depense" },
+      { id: "sport_competitions", label: "Compétitions/stages", flowType: "depense" },
+      { id: "sport_autres", label: "Autres", flowType: "depense" },
+    ],
+  },
+  {
+    id: "beaute", label: "Beauté", icon: Sparkles, color: "#B4578B",
+    subcategories: [
+      { id: "beaute_coiffeur", label: "Coiffeur/cheveux", flowType: "depense" },
+      { id: "beaute_ongles", label: "Ongles", flowType: "depense" },
+      { id: "beaute_cosmetiques", label: "Cosmétiques", flowType: "depense" },
+      { id: "beaute_autres", label: "Autres", flowType: "depense" },
+    ],
+  },
+  { id: "epargne", label: "Épargne", icon: PiggyBank, color: "#3E6B8B", flowType: "epargne" },
+  { id: "cadeaux", label: "Cadeaux", icon: Gift, color: "#7C5E8B", flowType: "depense" },
+  { id: "autres_depense", label: "Autres", icon: MoreHorizontal, color: "#8B8570", flowType: "depense" },
+];
+// Catégories proposées pour les budgets : l'épargne se gère via l'onglet Placements, pas via une limite de dépense.
+const BUDGET_EXPENSE_CATEGORIES = EXPENSE_CATEGORIES.filter((c) => c.id !== "epargne");
+const INCOME_CATEGORIES = [
+  { id: "salaire", label: "Salaire", icon: Wallet, color: "#3F6B4F" },
+  { id: "freelance", label: "Freelance", icon: Briefcase, color: "#2E6B6B" },
+  { id: "remboursement", label: "Remboursement", icon: RefreshCcw, color: "#5E6E8B" },
+  { id: "cadeau_recu", label: "Cadeau", icon: Gift, color: "#7C5E8B" },
+  { id: "epargne", label: "Retrait d'épargne", icon: PiggyBank, color: "#3E6B8B" },
+  { id: "autres_revenu", label: "Autres", icon: MoreHorizontal, color: "#8B8570" },
+];
+// Anciens id de catégories/sous-catégories -> nouveaux, pour ne pas perdre les données déjà saisies
+// lors de la refonte des catégories (transactions, budgets, charges récurrentes, dettes).
+const CATEGORY_MIGRATION = {
+  transport_essence: "essence",
+  transport_assurance: "assurances_auto",
+  transport_pret: "banque_pret",
+  logement_assurance: "assurances_habitation",
+  sante_mutuelle: "assurances_mutuelle",
+  sante_consultations: "sante_soins",
+  shopping: "shopping_autres",
+  abonnements: "loisirs_streaming",
+  factures: "autres_depense",
+  loisirs: "loisirs_sorties",
+  alimentation_courses: "courses",
+  alimentation_restaurant: "restaurant",
+  alimentation_extra: "restaurant",
+  alimentation: "courses",
+  shopping_beaute: "beaute_autres",
+};
+const migrateCategory = (id) => CATEGORY_MIGRATION[id] || id;
+// Résout un id de catégorie ou de sous-catégorie vers ses infos d'affichage + son flowType (charge/dépense).
+const catInfo = (id, kind) => {
+  const list = kind === "revenu" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  for (const c of list) {
+    if (c.id === id) return { id: c.id, label: c.label, icon: c.icon, color: c.color, flowType: c.flowType || "depense" };
+    if (c.subcategories) {
+      const s = c.subcategories.find((s) => s.id === id);
+      if (s) return { id: s.id, label: `${c.label} · ${s.label}`, icon: c.icon, color: c.color, flowType: s.flowType || "depense" };
+    }
+  }
+  const fb = list[list.length - 1];
+  return { id: fb.id, label: fb.label, icon: fb.icon, color: fb.color, flowType: fb.flowType || "depense" };
+};
+// Sélection par défaut d'une catégorie : renvoie le groupe + la première sous-catégorie si elle existe.
+const firstCat = (list) => {
+  const g = list[0];
+  return { group: g.id, category: g.subcategories ? g.subcategories[0].id : g.id };
+};
+
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const money = (n, currency = "EUR") =>
+  new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 2 }).format(n || 0);
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayYM = () => new Date().toISOString().slice(0, 7);
+const monthLabel = (ym) => {
+  const [y, m] = ym.split("-").map(Number);
+  const label = new Date(y, m - 1, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+const shiftMonth = (ym, delta) => {
+  const [y, m] = ym.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+const inMonth = (dateISO, ym) => dateISO.slice(0, 7) === ym;
+
+const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "CAD"];
+const MONTH_SHORT = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+
+/* ---------------------------------- bits ---------------------------------- */
+
+function Avatar({ label, color, size = 34 }) {
+  return (
+    <div
+      className="gl-sans"
+      style={{
+        width: size, height: size, borderRadius: "50%", background: color,
+        color: "#FBF9F3", display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: size * 0.4, fontWeight: 600, flexShrink: 0,
+      }}
+    >
+      {label ? label.charAt(0).toUpperCase() : "?"}
+    </div>
+  );
+}
+
+function Ring({ pct, color, size = 56, stroke = 6 }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <svg width={size} height={size} style={{ transform: "rotate(-90deg)", flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} stroke={C.border} strokeWidth={stroke} fill="none" />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} stroke={color} strokeWidth={stroke} fill="none"
+        strokeDasharray={circ} strokeDashoffset={circ - (circ * clamped) / 100}
+        strokeLinecap="round"
+        style={{ transition: "stroke-dashoffset 0.5s ease" }}
+      />
+    </svg>
+  );
+}
+
+function SegButton({ active, onClick, children, activeColor }) {
+  return (
+    <button
+      onClick={onClick}
+      className="gl-sans"
+      style={{
+        flex: 1, padding: "9px 6px", borderRadius: 10, fontSize: 13.5, fontWeight: 600,
+        border: `1px solid ${active ? activeColor : C.border}`,
+        background: active ? activeColor : "transparent",
+        color: active ? "#FBF9F3" : C.inkSoft,
+        transition: "all .15s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SectionHeader({ title, onAdd, addLabel }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+      <h3 className="gl-serif" style={{ fontSize: 18, fontWeight: 600, color: C.ink, margin: 0 }}>{title}</h3>
+      {onAdd && (
+        <button onClick={onAdd} className="gl-sans" style={{
+          display: "flex", alignItems: "center", gap: 4, fontSize: 12.5, fontWeight: 600,
+          color: C.gold, background: "none", border: "none", padding: "4px 2px",
+        }}>
+          <Plus size={14} strokeWidth={2.5} /> {addLabel || "Ajouter"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Empty({ text }) {
+  return (
+    <p className="gl-sans" style={{ fontSize: 13, color: C.muted, padding: "14px 0", margin: 0, lineHeight: 1.5 }}>
+      {text}
+    </p>
+  );
+}
+
+function CategoryPicker({ list, group, category, onSelect, allowWholeCategory }) {
+  const groupObj = list.find((c) => c.id === group) || list[0];
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+        {list.map((c) => {
+          const Icon = c.icon;
+          const sel = group === c.id;
+          return (
+            <button
+              key={c.id}
+              onClick={() => onSelect(c.id, allowWholeCategory ? c.id : (c.subcategories ? c.subcategories[0].id : c.id))}
+              className="gl-sans"
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "10px 4px",
+                borderRadius: 12, border: `1px solid ${sel ? c.color : C.border}`, background: sel ? c.color + "20" : C.card,
+              }}
+            >
+              <Icon size={16} color={c.color} />
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: C.inkSoft }}>{c.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {groupObj.subcategories && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          {allowWholeCategory && (
+            <button
+              onClick={() => onSelect(group, groupObj.id)}
+              className="gl-sans"
+              style={{
+                padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+                border: `1px solid ${category === groupObj.id ? groupObj.color : C.border}`, background: category === groupObj.id ? groupObj.color + "20" : C.card, color: C.inkSoft,
+              }}
+            >
+              Toute la catégorie
+            </button>
+          )}
+          {groupObj.subcategories.map((s) => {
+            const sel = category === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => onSelect(group, s.id)}
+                className="gl-sans"
+                style={{
+                  padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${sel ? groupObj.color : C.border}`, background: sel ? groupObj.color + "20" : C.card, color: C.inkSoft,
+                }}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------- app ---------------------------------- */
+
+/* ---------------------------------- Firebase (stockage gratuit, hors Claude) ---------------------------------- */
+// 1. Créez un projet gratuit sur https://console.firebase.google.com
+// 2. Ajoutez une "application Web", copiez la config qu'il vous donne, et remplacez l'objet ci-dessous.
+// 3. Activez Firestore Database (mode production) et l'authentification Anonyme (Authentication > Sign-in method).
+const firebaseConfig = {
+  apiKey: "AIzaSyCqCY89CGm7Yv1YikF-PVcWeRem63zQoGU",
+  authDomain: "compta-foyer.firebaseapp.com",
+  projectId: "compta-foyer",
+  storageBucket: "compta-foyer.firebasestorage.app",
+  messagingSenderId: "781790394869",
+  appId: "1:781790394869:web:5dd3b6c5237f282123c8bc",
+};
+let fbApp = null, fbDb = null, fbAuth = null, FIREBASE_READY = false;
+try {
+  if (firebaseConfig.apiKey !== "REMPLACER_apiKey") {
+    fbApp = firebase.initializeApp(firebaseConfig);
+    fbDb = firebase.firestore();
+    fbAuth = firebase.auth();
+    FIREBASE_READY = true;
+  }
+} catch (e) { console.error("Firebase init error", e); }
+
+function App() {
+  const [ready, setReady] = useState(false);
+  const [settings, setSettings] = useState({ person1: "Personne 1", person2: "Personne 2", foyerName: "Notre foyer", currency: "EUR", pins: {} });
+  const [transactions, setTransactions] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [recurring, setRecurring] = useState([]);
+  const [tab, setTab] = useState("foyer");
+  const [month, setMonth] = useState(todayYM());
+  const [view, setView] = useState("main"); // 'main' | 'year-select' | 'year-detail' | 'patrimoine-detail'
+  const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedPatrimoineId, setSelectedPatrimoineId] = useState(null);
+  const [placements, setPlacements] = useState([]);
+  const [debts, setDebts] = useState([]);
+  const [patrimoine, setPatrimoine] = useState([]);
+  const [patrimoineEntries, setPatrimoineEntries] = useState([]);
+  const [modal, setModal] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [unlocked, setUnlocked] = useState({ person1: false, person2: false });
+  const [pinValue, setPinValue] = useState("");
+  const [pinError, setPinError] = useState(false);
+  const [confirmRemovePin, setConfirmRemovePin] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    setPinValue("");
+    setPinError(false);
+    setConfirmRemovePin(false);
+    setView("main");
+    setSelectedYear(null);
+  }, [tab]);
+
+  const colRef = useRef(null);
+
+  useEffect(() => {
+    let unsubs = [];
+    (async () => {
+      if (!FIREBASE_READY) { setReady(true); return; } // config Firebase pas encore renseignée : l'appli reste utilisable en mémoire, sans sauvegarde.
+      try { await fbAuth.signInAnonymously(); } catch (e) { console.error("Connexion Firebase impossible", e); setReady(true); return; }
+      const col = fbDb.collection("householdData");
+      colRef.current = col;
+      const docIds = ["settings", "transactions", "budgets", "goals", "recurring", "placements", "debts", "patrimoine", "patrimoine_entries"];
+      const snaps = await Promise.all(docIds.map((id) => col.doc(id).get().catch(() => null)));
+      const [s, t, b, g, r, pl, dt, pat, pate] = snaps;
+      if (s?.exists) setSettings(s.data());
+      if (t?.exists) setTransactions((t.data().items || []).map((x) => ({ ...x, category: migrateCategory(x.category) })));
+      if (b?.exists) setBudgets((b.data().items || []).map((x) => ({ ...x, category: migrateCategory(x.category) })));
+      if (g?.exists) setGoals(g.data().items || []);
+      if (r?.exists) setRecurring((r.data().items || []).map((x) => ({ ...x, category: migrateCategory(x.category) })));
+      if (pl?.exists) setPlacements(pl.data().items || []);
+      if (dt?.exists) setDebts((dt.data().items || []).map((x) => ({ ...x, category: migrateCategory(x.category) })));
+      if (pat?.exists) setPatrimoine(pat.data().items || []);
+      if (pate?.exists) setPatrimoineEntries(pate.data().items || []);
+      setReady(true);
+
+      // écoute en direct : si votre compagne modifie quelque chose sur son téléphone, ça apparaît ici automatiquement.
+      const bindLive = (id, setter, migrate) => col.doc(id).onSnapshot((snap) => {
+        if (!snap.exists) return;
+        const data = snap.data();
+        const value = data.items !== undefined ? data.items : data;
+        setter(migrate ? value.map((x) => ({ ...x, category: migrateCategory(x.category) })) : value);
+      }, (e) => console.error("Sync error:", id, e));
+      unsubs = [
+        bindLive("settings", setSettings, false),
+        bindLive("transactions", setTransactions, true),
+        bindLive("budgets", setBudgets, true),
+        bindLive("goals", setGoals, false),
+        bindLive("recurring", setRecurring, true),
+        bindLive("placements", setPlacements, false),
+        bindLive("debts", setDebts, true),
+        bindLive("patrimoine", setPatrimoine, false),
+        bindLive("patrimoine_entries", setPatrimoineEntries, false),
+      ];
+    })();
+    return () => unsubs.forEach((u) => u && u());
+  }, []);
+
+  // Chaque catégorie de données est un seul document JSON dans Firestore ;
+  // les tableaux sont enveloppés dans { items: [...] } car un document Firestore est un objet.
+  async function persist(id, value, setter, isArray) {
+    setter(value);
+    if (!colRef.current) return;
+    try { await colRef.current.doc(id).set(isArray ? { items: value } : value); } catch (e) { console.error(e); }
+  }
+  const saveSettings = (v) => persist("settings", v, setSettings, false);
+  const saveTx = (v) => persist("transactions", v, setTransactions, true);
+  const saveBudgets = (v) => persist("budgets", v, setBudgets, true);
+  const saveGoals = (v) => persist("goals", v, setGoals, true);
+  const saveRecurring = (v) => persist("recurring", v, setRecurring, true);
+  const savePlacements = (v) => persist("placements", v, setPlacements, true);
+  const saveDebts = (v) => persist("debts", v, setDebts, true);
+  const savePatrimoine = (v) => persist("patrimoine", v, setPatrimoine, true);
+  const savePatrimoineEntries = (v) => persist("patrimoine_entries", v, setPatrimoineEntries, true);
+
+  const scopeName = (scope) => (scope === "foyer" ? settings.foyerName : scope === "patrimoine" ? "Projets" : scope === "person1" ? settings.person1 : settings.person2);
+  const scopeColor = (scope) => C[scope];
+
+  /* ---- derived ---- */
+  const txThisMonth = useMemo(() => transactions.filter((t) => inMonth(t.date, month)), [transactions, month]);
+  // Chaque espace (foyer, personne 1, personne 2) est un compte indépendant :
+  // aucune agrégation entre eux, même sur l'onglet Foyer.
+  const txForTab = useMemo(() => txThisMonth.filter((t) => t.person === tab), [txThisMonth, tab]);
+  const totals = useMemo(() => {
+    const rev = txForTab.filter((t) => t.kind === "revenu" && t.category !== "epargne").reduce((a, t) => a + t.amount, 0);
+    const dep = txForTab.filter((t) => t.kind === "depense" && t.category !== "epargne").reduce((a, t) => a + t.amount, 0);
+    const epargne =
+      txForTab.filter((t) => t.category === "epargne" && t.kind === "depense").reduce((a, t) => a + t.amount, 0) -
+      txForTab.filter((t) => t.category === "epargne" && t.kind === "revenu").reduce((a, t) => a + t.amount, 0);
+    return { rev, dep, epargne, solde: rev - dep };
+  }, [txForTab]);
+  // Solde cumulé : report de l'argent restant d'un mois sur l'autre (comme un vrai solde de compte),
+  // contrairement à Revenus/Dépenses ci-dessous qui restent strictement ceux du mois affiché.
+  const soldeCumule = useMemo(
+    () =>
+      transactions
+        .filter((t) => t.person === tab && t.date.slice(0, 7) <= month)
+        .reduce((a, t) => a + (t.kind === "revenu" ? t.amount : -t.amount), 0),
+    [transactions, tab, month]
+  );
+  const recurringMonthlyTotal = useMemo(() => {
+    const list = recurring.filter((r) => r.scope === tab);
+    const dep = list.filter((r) => r.kind === "depense").reduce((a, r) => a + r.amount, 0);
+    const rev = list.filter((r) => r.kind === "revenu").reduce((a, r) => a + r.amount, 0);
+    return dep - rev;
+  }, [recurring, tab]);
+  const lockedNow = tab !== "foyer" && tab !== "patrimoine" && !!(settings.pins && settings.pins[tab]) && !unlocked[tab];
+
+  // Résumé annuel : page dédiée par espace, menu des années à partir de 2026.
+  const YEARS = useMemo(() => {
+    const start = 2026;
+    const end = Math.max(start, new Date().getFullYear());
+    const arr = [];
+    for (let y = end; y >= start; y--) arr.push(y);
+    return arr;
+  }, []);
+  const yearData = useMemo(() => {
+    const y = selectedYear || YEARS[0];
+    const txY = transactions.filter((t) => t.person === tab && t.date.slice(0, 4) === String(y));
+    let cumulEpargne = 0;
+    const monthly = MONTH_SHORT.map((label, idx) => {
+      const mm = String(idx + 1).padStart(2, "0");
+      const list = txY.filter((t) => t.date.slice(5, 7) === mm);
+      const epargneMois =
+        list.filter((t) => t.category === "epargne" && t.kind === "depense").reduce((a, t) => a + t.amount, 0) -
+        list.filter((t) => t.category === "epargne" && t.kind === "revenu").reduce((a, t) => a + t.amount, 0);
+      cumulEpargne += epargneMois;
+      return {
+        label,
+        Revenus: list.filter((t) => t.kind === "revenu" && t.category !== "epargne").reduce((a, t) => a + t.amount, 0),
+        Charges: list.filter((t) => t.kind === "depense" && t.category !== "epargne" && catInfo(t.category, "depense").flowType === "charge").reduce((a, t) => a + t.amount, 0),
+        Dépenses: list.filter((t) => t.kind === "depense" && t.category !== "epargne" && catInfo(t.category, "depense").flowType !== "charge").reduce((a, t) => a + t.amount, 0),
+        Épargne: epargneMois,
+        Solde: list.filter((t) => t.kind === "revenu").reduce((a, t) => a + t.amount, 0) - list.filter((t) => t.kind === "depense").reduce((a, t) => a + t.amount, 0),
+        "Épargne cumulée": cumulEpargne,
+      };
+    });
+    const totals = monthly.reduce(
+      (acc, m) => ({ rev: acc.rev + m.Revenus, charges: acc.charges + m.Charges, dep: acc.dep + m.Dépenses, sav: acc.sav + m.Épargne }),
+      { rev: 0, charges: 0, dep: 0, sav: 0 }
+    );
+    const catTotals = {};
+    txY.filter((t) => t.kind === "depense" && t.category !== "epargne").forEach((t) => {
+      const top = EXPENSE_CATEGORIES.find((c) => c.id === t.category || (c.subcategories && c.subcategories.some((s) => s.id === t.category)));
+      const key = top ? top.id : "autres_depense";
+      if (!catTotals[key]) catTotals[key] = { name: top ? top.label : "Autres", value: 0, color: top ? top.color : C.muted };
+      catTotals[key].value += t.amount;
+    });
+    const categoryBreakdown = Object.values(catTotals).sort((a, b) => b.value - a.value);
+    return { monthly, totals, categoryBreakdown, hasData: txY.length > 0 };
+  }, [transactions, tab, selectedYear, YEARS]);
+
+  function tryUnlock() {
+    if (pinValue && settings.pins && pinValue === settings.pins[tab]) {
+      setUnlocked({ ...unlocked, [tab]: true });
+      setPinValue("");
+      setPinError(false);
+    } else {
+      setPinError(true);
+    }
+  }
+
+  const budgetsForTab = budgets.filter((b) => b.scope === tab);
+  const goalsForTab = goals.filter((g) => g.scope === tab);
+  const recurringForTab = recurring.filter((r) => r.scope === tab);
+  const placementsForTab = placements.filter((p) => p.scope === tab);
+  const debtsForTab = debts.filter((d) => d.scope === tab);
+  const recentTx = [...txForTab].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 25);
+
+  const spentFor = (scope, category) => {
+    const groupObj = EXPENSE_CATEGORIES.find((c) => c.id === category);
+    const matchIds = groupObj && groupObj.subcategories ? [groupObj.id, ...groupObj.subcategories.map((s) => s.id)] : [category];
+    return txThisMonth.filter((t) => t.person === scope && t.kind === "depense" && matchIds.includes(t.category)).reduce((a, t) => a + t.amount, 0);
+  };
+
+  /* ---- modal handling ---- */
+  function openModal(type, extra = {}) {
+    const baseScope = extra.scope || tab;
+    const defExpense = firstCat(EXPENSE_CATEGORIES);
+    let d = {};
+    if (type === "transaction") d = { kind: "depense", amount: "", scope: baseScope, catGroup: defExpense.group, category: defExpense.category, date: todayISO(), note: "", debtId: "" };
+    if (type === "budget") d = { scope: baseScope, catGroup: defExpense.group, category: defExpense.category, limit: "" };
+    if (type === "goal") d = { scope: baseScope, name: "", target: "", deadline: "" };
+    if (type === "goal-add") d = { goalId: extra.goalId, amount: "" };
+    if (type === "recurring") d = { scope: baseScope, name: "", amount: "", kind: "depense", catGroup: defExpense.group, category: defExpense.category, day: "1", debtId: "" };
+    if (type === "settings") d = { ...settings };
+    if (type === "set-pin") d = { newPin: "", confirmPin: "" };
+    if (type === "placement") d = { scope: baseScope, name: "", initialBalance: "", goalId: "" };
+    if (type === "placement-move") d = { placementId: extra.placementId, direction: extra.direction || "verser", amount: "" };
+    if (type === "debt") { const dc = firstCat(BUDGET_EXPENSE_CATEGORIES); d = { scope: baseScope, name: "", principal: "", remaining: "", catGroup: dc.group, category: dc.category }; }
+    if (type === "debt-pay") d = { debtId: extra.debtId, amount: "" };
+    if (type === "patrimoine-project") d = { name: "", target: "" };
+    if (type === "patrimoine-entry") {
+      const existing = patrimoineEntries.find((e) => e.projectId === selectedPatrimoineId && e.month === (extra.month || todayYM()));
+      d = { projectId: selectedPatrimoineId, month: extra.month || todayYM(), person1: existing ? String(existing.person1) : "", person2: existing ? String(existing.person2) : "" };
+    }
+    setDraft(d);
+    setFormError("");
+    setModal({ type });
+  }
+  const closeModal = () => { setModal(null); setDraft({}); setFormError(""); };
+
+  function submitModal() {
+    if (modal.type === "transaction") {
+      const amt = parseFloat(String(draft.amount).replace(",", "."));
+      if (!amt || amt <= 0) return setFormError("Indiquez un montant valide.");
+      if (!draft.category) return setFormError("Choisissez une catégorie.");
+      let linkedDebt = null;
+      if (draft.debtId) {
+        linkedDebt = debts.find((d) => d.id === draft.debtId);
+        if (linkedDebt && amt > linkedDebt.remaining) return setFormError("Ce montant dépasse le capital restant dû de la dette liée.");
+      }
+      saveTx([...transactions, {
+        id: uid(), person: draft.scope, kind: draft.kind, amount: amt, category: draft.category, date: draft.date || todayISO(), note: draft.note?.trim() || "",
+        debtId: linkedDebt ? linkedDebt.id : undefined,
+      }]);
+      if (linkedDebt) saveDebts(debts.map((d) => (d.id === linkedDebt.id ? { ...d, remaining: d.remaining - amt } : d)));
+    }
+    if (modal.type === "budget") {
+      const lim = parseFloat(String(draft.limit).replace(",", "."));
+      if (!lim || lim <= 0) return setFormError("Indiquez une limite mensuelle valide.");
+      const filtered = budgets.filter((b) => !(b.scope === draft.scope && b.category === draft.category));
+      saveBudgets([...filtered, { id: uid(), scope: draft.scope, category: draft.category, limit: lim }]);
+    }
+    if (modal.type === "goal") {
+      const target = parseFloat(String(draft.target).replace(",", "."));
+      if (!draft.name.trim()) return setFormError("Donnez un nom à cet objectif.");
+      if (!target || target <= 0) return setFormError("Indiquez un montant visé valide.");
+      saveGoals([...goals, { id: uid(), scope: draft.scope, name: draft.name.trim(), target, current: 0, deadline: draft.deadline || "" }]);
+    }
+    if (modal.type === "goal-add") {
+      const amt = parseFloat(String(draft.amount).replace(",", "."));
+      if (!amt || amt <= 0) return setFormError("Indiquez un montant valide.");
+      saveGoals(goals.map((g) => (g.id === draft.goalId ? { ...g, current: g.current + amt } : g)));
+    }
+    if (modal.type === "recurring") {
+      const amt = parseFloat(String(draft.amount).replace(",", "."));
+      const day = parseInt(draft.day, 10);
+      if (!draft.name.trim()) return setFormError("Donnez un nom à cette charge (ex. Loyer, Netflix).");
+      if (!amt || amt <= 0) return setFormError("Indiquez un montant valide.");
+      if (!day || day < 1 || day > 28) return setFormError("Le jour du mois doit être compris entre 1 et 28.");
+      saveRecurring([...recurring, { id: uid(), scope: draft.scope, name: draft.name.trim(), amount: amt, kind: draft.kind, category: draft.category, day, debtId: draft.debtId || undefined }]);
+    }
+    if (modal.type === "settings") {
+      saveSettings({ ...settings, person1: draft.person1.trim() || "Personne 1", person2: draft.person2.trim() || "Personne 2", foyerName: draft.foyerName.trim() || "Notre foyer", currency: draft.currency });
+    }
+    if (modal.type === "set-pin") {
+      const p1 = String(draft.newPin).trim();
+      const p2 = String(draft.confirmPin).trim();
+      if (!/^\d{4,6}$/.test(p1)) return setFormError("Le code doit contenir 4 à 6 chiffres.");
+      if (p1 !== p2) return setFormError("Les deux codes ne correspondent pas.");
+      const pins = { ...(settings.pins || {}), [tab]: p1 };
+      saveSettings({ ...settings, pins });
+      setUnlocked({ ...unlocked, [tab]: true });
+    }
+    if (modal.type === "placement") {
+      if (!draft.name.trim()) return setFormError("Donnez un nom à ce placement.");
+      const initial = parseFloat(String(draft.initialBalance).replace(",", ".")) || 0;
+      savePlacements([...placements, { id: uid(), scope: draft.scope, name: draft.name.trim(), balance: initial, goalId: draft.goalId || null }]);
+    }
+    if (modal.type === "placement-move") {
+      const amt = parseFloat(String(draft.amount).replace(",", "."));
+      const placement = placements.find((p) => p.id === draft.placementId);
+      if (!placement || !amt || amt <= 0) return setFormError("Indiquez un montant valide.");
+      if (draft.direction === "retirer" && amt > placement.balance) return setFormError("Le solde du placement est insuffisant.");
+      const delta = draft.direction === "verser" ? amt : -amt;
+      savePlacements(placements.map((p) => (p.id === placement.id ? { ...p, balance: p.balance + delta } : p)));
+      saveTx([...transactions, {
+        id: uid(), person: placement.scope,
+        kind: draft.direction === "verser" ? "depense" : "revenu",
+        amount: amt, category: "epargne", date: todayISO(),
+        note: `${draft.direction === "verser" ? "Versement" : "Retrait"} : ${placement.name}`,
+        placementId: placement.id,
+      }]);
+    }
+    if (modal.type === "debt") {
+      const principal = parseFloat(String(draft.principal).replace(",", "."));
+      if (!draft.name.trim()) return setFormError("Donnez un nom à cette dette (ex. Prêt voiture).");
+      if (!principal || principal <= 0) return setFormError("Indiquez le montant emprunté.");
+      const remainingRaw = String(draft.remaining).trim();
+      const remaining = remainingRaw ? parseFloat(remainingRaw.replace(",", ".")) : principal;
+      saveDebts([...debts, { id: uid(), scope: draft.scope, name: draft.name.trim(), principal, remaining: Math.min(remaining, principal), category: draft.category }]);
+    }
+    if (modal.type === "debt-pay") {
+      const amt = parseFloat(String(draft.amount).replace(",", "."));
+      const debt = debts.find((d) => d.id === draft.debtId);
+      if (!debt || !amt || amt <= 0) return setFormError("Indiquez un montant valide.");
+      if (amt > debt.remaining) return setFormError("Ce montant dépasse le capital restant dû.");
+      saveDebts(debts.map((d) => (d.id === debt.id ? { ...d, remaining: d.remaining - amt } : d)));
+      saveTx([...transactions, {
+        id: uid(), person: debt.scope, kind: "depense", amount: amt, category: debt.category, date: todayISO(),
+        note: `Remboursement : ${debt.name}`, debtId: debt.id,
+      }]);
+    }
+    if (modal.type === "patrimoine-project") {
+      if (!draft.name.trim()) return setFormError("Donnez un nom à ce projet.");
+      const target = String(draft.target).trim() ? parseFloat(String(draft.target).replace(",", ".")) : null;
+      savePatrimoine([...patrimoine, { id: uid(), name: draft.name.trim(), target: target && target > 0 ? target : null }]);
+    }
+    if (modal.type === "patrimoine-entry") {
+      const p1 = parseFloat(String(draft.person1).replace(",", ".")) || 0;
+      const p2 = parseFloat(String(draft.person2).replace(",", ".")) || 0;
+      if (!draft.month) return setFormError("Choisissez un mois.");
+      const filtered = patrimoineEntries.filter((e) => !(e.projectId === draft.projectId && e.month === draft.month));
+      savePatrimoineEntries([...filtered, { id: uid(), projectId: draft.projectId, month: draft.month, person1: p1, person2: p2 }]);
+    }
+    closeModal();
+  }
+
+  function toggleRecurringPaid(r) {
+    const existing = txThisMonth.find((t) => t.recurringId === r.id);
+    if (existing) {
+      saveTx(transactions.filter((t) => t.id !== existing.id));
+      if (r.debtId) saveDebts(debts.map((d) => (d.id === r.debtId ? { ...d, remaining: Math.min(d.principal, d.remaining + r.amount) } : d)));
+    } else {
+      saveTx([...transactions, { id: uid(), person: r.scope, kind: r.kind, amount: r.amount, category: r.category, date: todayISO(), note: `Récurrent : ${r.name}`, recurringId: r.id, debtId: r.debtId || undefined }]);
+      if (r.debtId) saveDebts(debts.map((d) => (d.id === r.debtId ? { ...d, remaining: Math.max(0, d.remaining - r.amount) } : d)));
+    }
+  }
+  function deleteItem(kind, id) {
+    if (kind === "tx") saveTx(transactions.filter((t) => t.id !== id));
+    if (kind === "budget") saveBudgets(budgets.filter((b) => b.id !== id));
+    if (kind === "goal") saveGoals(goals.filter((g) => g.id !== id));
+    if (kind === "recurring") saveRecurring(recurring.filter((r) => r.id !== id));
+    if (kind === "placement") savePlacements(placements.filter((p) => p.id !== id));
+    if (kind === "debt") saveDebts(debts.filter((d) => d.id !== id));
+    if (kind === "patrimoine-project") {
+      savePatrimoine(patrimoine.filter((p) => p.id !== id));
+      savePatrimoineEntries(patrimoineEntries.filter((e) => e.projectId !== id));
+    }
+    if (kind === "patrimoine-entry") savePatrimoineEntries(patrimoineEntries.filter((e) => e.id !== id));
+    setConfirmDeleteId(null);
+  }
+
+  if (!ready) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.paper, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <style>{FONTS}</style>
+        <p className="gl-sans" style={{ color: C.muted, fontSize: 14 }}>Ouverture de la comptabilité…</p>
+      </div>
+    );
+  }
+
+  const tabColor = scopeColor(tab);
+  const cats = draft.kind === "revenu" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.paper, display: "flex", justifyContent: "center" }}>
+      <style>{FONTS}</style>
+      <div style={{ width: "100%", maxWidth: 440, minHeight: "100vh", background: C.paper, position: "relative", paddingBottom: 92 }}>
+
+        {!FIREBASE_READY && (
+          <div style={{ margin: "12px 20px 0", background: "#A34C3618", border: `1px solid ${C.expense}`, borderRadius: 12, padding: "10px 14px" }}>
+            <p className="gl-sans" style={{ fontSize: 12, color: C.expense, margin: 0, lineHeight: 1.5 }}>
+              ⚠️ Firebase n'est pas configuré : rien n'est sauvegardé ni synchronisé pour l'instant. Complétez <code>firebaseConfig</code> dans le fichier.
+            </p>
+          </div>
+        )}
+
+        {view === "main" && (
+        <>
+        {/* header */}
+        <div style={{ padding: "18px 20px 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h1 className="gl-serif" style={{ fontSize: 22, fontWeight: 700, color: C.ink, margin: 0 }}>Comptabilité</h1>
+            <p className="gl-sans" style={{ fontSize: 12.5, color: C.muted, margin: "2px 0 0" }}>{scopeName(tab)}</p>
+          </div>
+          <button onClick={() => openModal("settings")} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 8 }}>
+            <Settings size={17} color={C.inkSoft} />
+          </button>
+        </div>
+
+        {/* month switcher */}
+        {tab !== "patrimoine" && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, padding: "6px 20px 14px" }}>
+          <button onClick={() => setMonth(shiftMonth(month, -1))} style={{ background: "none", border: "none", padding: 4 }}>
+            <ChevronLeft size={18} color={C.inkSoft} />
+          </button>
+          <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.inkSoft, minWidth: 150, textAlign: "center" }}>
+            {monthLabel(month)}
+          </span>
+          <button onClick={() => setMonth(shiftMonth(month, 1))} style={{ background: "none", border: "none", padding: 4 }}>
+            <ChevronRight size={18} color={C.inkSoft} />
+          </button>
+        </div>
+        )}
+
+        {/* patrimoine : liste des projets */}
+        {tab === "patrimoine" && (
+          <div style={{ margin: "0 20px 22px" }}>
+            <SectionHeader title="Projets" onAdd={() => openModal("patrimoine-project")} addLabel="Nouveau" />
+            {patrimoine.length === 0 && (
+              <Empty text="Aucun projet pour l'instant. Créez-en un (immobilier, voyage...) pour suivre l'épargne combinée de vous deux, mois après mois, saisie à la main." />
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {patrimoine.map((proj) => {
+                const entries = patrimoineEntries.filter((e) => e.projectId === proj.id).sort((a, b) => a.month.localeCompare(b.month));
+                const last = entries[entries.length - 1];
+                const total = last ? last.person1 + last.person2 : 0;
+                const pct = proj.target > 0 ? Math.min(100, (total / proj.target) * 100) : null;
+                return (
+                  <button
+                    key={proj.id}
+                    onClick={() => { setSelectedPatrimoineId(proj.id); setView("patrimoine-detail"); }}
+                    style={{ width: "100%", textAlign: "left", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}
+                  >
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: C.paper, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <Gem size={16} color={C.patrimoine} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, display: "block" }}>{proj.name}</span>
+                      <span className="gl-mono" style={{ fontSize: 13, color: C.patrimoine }}>
+                        {money(total, settings.currency)}{proj.target > 0 ? ` / ${money(proj.target, settings.currency)} (${pct.toFixed(0)}%)` : ""}
+                      </span>
+                    </div>
+                    <ChevronRight size={17} color={C.muted} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* gestion du code personnel */}
+        {tab !== "foyer" && tab !== "patrimoine" && !lockedNow && (
+          <div style={{ display: "flex", gap: 14, padding: "0 20px 14px", justifyContent: "center", flexWrap: "wrap" }}>
+            {!settings.pins?.[tab] && (
+              <button onClick={() => openModal("set-pin")} className="gl-sans" style={{ fontSize: 12, fontWeight: 600, color: C.gold, background: "none", border: "none" }}>
+                Ajouter un code pour cet espace
+              </button>
+            )}
+            {settings.pins?.[tab] && !confirmRemovePin && (
+              <>
+                <button onClick={() => openModal("set-pin")} className="gl-sans" style={{ fontSize: 12, fontWeight: 600, color: C.gold, background: "none", border: "none" }}>
+                  Modifier le code
+                </button>
+                <button onClick={() => setUnlocked({ ...unlocked, [tab]: false })} className="gl-sans" style={{ fontSize: 12, fontWeight: 600, color: C.inkSoft, background: "none", border: "none" }}>
+                  Verrouiller
+                </button>
+                <button onClick={() => setConfirmRemovePin(true)} className="gl-sans" style={{ fontSize: 12, fontWeight: 600, color: C.muted, background: "none", border: "none" }}>
+                  Supprimer le code
+                </button>
+              </>
+            )}
+            {settings.pins?.[tab] && confirmRemovePin && (
+              <>
+                <span className="gl-sans" style={{ fontSize: 12, color: C.muted }}>Supprimer ce code ?</span>
+                <button
+                  onClick={() => { const pins = { ...(settings.pins || {}) }; delete pins[tab]; saveSettings({ ...settings, pins }); setConfirmRemovePin(false); }}
+                  className="gl-sans" style={{ fontSize: 12, fontWeight: 600, color: C.expense, background: "none", border: "none" }}
+                >
+                  Confirmer
+                </button>
+                <button onClick={() => setConfirmRemovePin(false)} className="gl-sans" style={{ fontSize: 12, color: C.muted, background: "none", border: "none" }}>
+                  Annuler
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {tab !== "foyer" && tab !== "patrimoine" && lockedNow && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "50px 30px 20px", textAlign: "center" }}>
+            <Avatar label={scopeName(tab)} color={C[tab]} size={56} />
+            <h2 className="gl-serif" style={{ fontSize: 20, fontWeight: 600, color: C.ink, margin: "16px 0 4px" }}>{scopeName(tab)}</h2>
+            <p className="gl-sans" style={{ fontSize: 13, color: C.muted, margin: "0 0 24px" }}>Espace personnel verrouillé</p>
+            <input
+              type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} autoFocus
+              value={pinValue}
+              onChange={(e) => { setPinValue(e.target.value.replace(/\D/g, "")); setPinError(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") tryUnlock(); }}
+              placeholder="Code"
+              className="gl-serif"
+              style={{
+                width: 140, textAlign: "center", fontSize: 26, letterSpacing: 8, padding: "10px 0",
+                border: "none", borderBottom: `2px solid ${pinError ? C.expense : C.border}`, background: "none", outline: "none", color: C.ink,
+              }}
+            />
+            {pinError && <p className="gl-sans" style={{ fontSize: 12, color: C.expense, margin: "10px 0 0" }}>Code incorrect</p>}
+            <button onClick={tryUnlock} className="gl-sans" style={{ marginTop: 22, padding: "11px 28px", borderRadius: 12, border: "none", background: C[tab], color: "#fff", fontSize: 13.5, fontWeight: 600 }}>
+              Déverrouiller
+            </button>
+          </div>
+        )}
+
+        {tab !== "patrimoine" && !lockedNow && (
+        <>
+        {/* hero balance */}
+        <div style={{ margin: "0 20px 18px", background: C.ink, borderRadius: 18, padding: "22px 20px" }}>
+          <p className="gl-sans" style={{ fontSize: 12, color: "#B9C2B4", margin: "0 0 6px" }}>Solde</p>
+          <p className="gl-serif" style={{ fontSize: 34, fontWeight: 600, color: "#FBF9F3", margin: 0 }}>
+            {money(soldeCumule, settings.currency)}
+          </p>
+          <p className="gl-sans" style={{ fontSize: 11, color: "#8A9485", margin: "12px 0 8px" }}>Ce mois-ci</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <ArrowUpRight size={14} color="#7FA98A" />
+                <span className="gl-mono" style={{ fontSize: 13, color: "#DCE3D6" }}>{money(totals.rev, settings.currency)}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <ArrowDownRight size={14} color="#C98A73" />
+                <span className="gl-mono" style={{ fontSize: 13, color: "#DCE3D6" }}>{money(totals.dep, settings.currency)}</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <PiggyBank size={14} color="#7FA0C9" />
+                <span className="gl-mono" style={{ fontSize: 13, color: "#DCE3D6" }}>{money(totals.epargne, settings.currency)}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <CalendarClock size={14} color="#C9AE7F" />
+                <span className="gl-mono" style={{ fontSize: 13, color: "#DCE3D6" }}>{money(recurringMonthlyTotal, settings.currency)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* résumé annuel : bouton d'accès */}
+        <div style={{ margin: "0 20px 22px" }}>
+          <button
+            onClick={() => setView("year-select")}
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}
+          >
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.paper, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <BarChart3 size={17} color={tabColor} />
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <p className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, margin: 0 }}>Résumé annuel</p>
+              <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, margin: "2px 0 0" }}>Revenus, charges, dépenses, épargne</p>
+            </div>
+            <ChevronRight size={17} color={C.muted} />
+          </button>
+        </div>
+
+        {/* budgets */}
+        <div style={{ margin: "0 20px 22px" }}>
+          <SectionHeader title="Budgets" onAdd={() => openModal("budget")} />
+          {budgetsForTab.length === 0 && <Empty text="Aucun budget défini. Fixez une limite par catégorie pour garder un œil sur vos dépenses." />}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {budgetsForTab.map((b) => {
+              const info = catInfo(b.category, "depense");
+              const spent = spentFor(b.scope, b.category);
+              const pct = Math.min(100, (spent / b.limit) * 100);
+              const over = spent > b.limit;
+              const Icon = info.icon;
+              return (
+                <div key={b.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+                    <Icon size={15} color={info.color} />
+                    <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, flex: 1 }}>{info.label}</span>
+                    <span className="gl-mono" style={{ fontSize: 12.5, color: over ? C.expense : C.muted }}>
+                      {money(spent, settings.currency)} / {money(b.limit, settings.currency)}
+                    </span>
+                    <button onClick={() => deleteItem("budget", b.id)}><Trash2 size={13} color={C.muted} /></button>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 4, background: C.border, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: over ? C.expense : info.color, borderRadius: 4, transition: "width .4s" }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* goals */}
+        <div style={{ margin: "0 20px 22px" }}>
+          <SectionHeader title="Objectifs d'épargne" onAdd={() => openModal("goal")} />
+          {goalsForTab.length === 0 && <Empty text="Aucun objectif pour l'instant. Créez-en un pour mettre de l'argent de côté vers un projet précis." />}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {goalsForTab.map((g) => {
+              const linkedPlacement = placements.find((p) => p.goalId === g.id);
+              // Pour un objectif lié à un placement, la jauge repart à zéro chaque mois : elle reflète
+              // uniquement le net versé/retiré ce mois-ci, pas le solde cumulé du placement (qui, lui, est conservé).
+              const monthlyNet = linkedPlacement
+                ? txThisMonth.filter((t) => t.placementId === linkedPlacement.id).reduce((a, t) => a + (t.kind === "depense" ? t.amount : -t.amount), 0)
+                : null;
+              const displayCurrent = linkedPlacement ? Math.max(0, monthlyNet) : g.current;
+              const pct = Math.min(100, (displayCurrent / g.target) * 100);
+              return (
+                <div key={g.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <Ring pct={pct} color={tabColor} size={48} stroke={5} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink }}>{g.name}</span>
+                      {g.deadline && <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted }}>· {new Date(g.deadline).toLocaleDateString("fr-FR")}</span>}
+                    </div>
+                    <p className="gl-mono" style={{ fontSize: 12, color: C.muted, margin: "3px 0 0" }}>
+                      {money(displayCurrent, settings.currency)} {linkedPlacement ? "versés ce mois" : "sur"} {linkedPlacement ? `(objectif ${money(g.target, settings.currency)})` : money(g.target, settings.currency)}
+                    </p>
+                    {linkedPlacement && (
+                      <p className="gl-sans" style={{ fontSize: 10.5, color: C.epargne, margin: "3px 0 0", display: "flex", alignItems: "center", gap: 4 }}>
+                        <PiggyBank size={10} /> {linkedPlacement.name} · solde réel {money(linkedPlacement.balance, settings.currency)}
+                      </p>
+                    )}
+                  </div>
+                  {!linkedPlacement && (
+                    <button onClick={() => openModal("goal-add", { goalId: g.id })} style={{ background: C.paper, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 9px" }}>
+                      <Plus size={13} color={C.inkSoft} />
+                    </button>
+                  )}
+                  <button onClick={() => deleteItem("goal", g.id)}><Trash2 size={13} color={C.muted} /></button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* épargne & placements */}
+        <div style={{ margin: "0 20px 22px" }}>
+          <SectionHeader title="Épargne & placements" onAdd={() => openModal("placement")} addLabel="Nouveau" />
+          {placementsForTab.length === 0 && (
+            <Empty text="Aucun placement enregistré. Ajoutez vos livrets, PEA, assurance-vie… Chaque versement comptera comme une dépense du mois, chaque retrait comme un revenu." />
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {placementsForTab.map((p) => (
+              <div key={p.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: C.paper, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <PiggyBank size={16} color={C.epargne} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, display: "block" }}>{p.name}</span>
+                  <span className="gl-mono" style={{ fontSize: 13, color: C.epargne }}>{money(p.balance, settings.currency)}</span>
+                </div>
+                <button onClick={() => openModal("placement-move", { placementId: p.id, direction: "verser" })} title="Verser"
+                  style={{ background: C.paper, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 7px" }}>
+                  <Plus size={13} color={C.income} />
+                </button>
+                <button onClick={() => openModal("placement-move", { placementId: p.id, direction: "retirer" })} title="Retirer"
+                  style={{ background: C.paper, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 7px" }}>
+                  <ArrowDownRight size={13} color={C.expense} />
+                </button>
+                <button onClick={() => deleteItem("placement", p.id)}><Trash2 size={13} color={C.muted} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* dettes & prêts */}
+        <div style={{ margin: "0 20px 22px" }}>
+          <SectionHeader title="Prêts" onAdd={() => openModal("debt")} addLabel="Nouveau" />
+          {debtsForTab.length === 0 && (
+            <Empty text="Aucune dette enregistrée. Ajoutez un prêt (voiture, études...) pour suivre ce qu'il vous reste à rembourser." />
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {debtsForTab.map((d) => {
+              const paid = d.principal - d.remaining;
+              const pct = d.principal > 0 ? Math.min(100, (paid / d.principal) * 100) : 0;
+              return (
+                <div key={d.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <Ring pct={pct} color={C.dette} size={48} stroke={5} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, display: "block" }}>{d.name}</span>
+                    <p className="gl-mono" style={{ fontSize: 12, color: C.muted, margin: "3px 0 0" }}>
+                      reste {money(d.remaining, settings.currency)} sur {money(d.principal, settings.currency)}
+                    </p>
+                    <p className="gl-sans" style={{ fontSize: 10.5, color: C.dette, margin: "3px 0 0" }}>{pct.toFixed(0)}% remboursé</p>
+                  </div>
+                  {d.remaining > 0 && (
+                    <button onClick={() => openModal("debt-pay", { debtId: d.id })} title="Rembourser" style={{ background: C.paper, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 9px" }}>
+                      <Plus size={13} color={C.inkSoft} />
+                    </button>
+                  )}
+                  <button onClick={() => deleteItem("debt", d.id)}><Trash2 size={13} color={C.muted} /></button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* recurring */}
+        <div style={{ margin: "0 20px 22px" }}>
+          <SectionHeader title="Charges récurrentes" onAdd={() => openModal("recurring")} />
+          {recurringForTab.length === 0 && <Empty text="Aucune charge récurrente enregistrée. Ajoutez vos abonnements ou factures régulières." />}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {recurringForTab.map((r) => {
+              const info = catInfo(r.category, r.kind);
+              const Icon = info.icon;
+              const isPaid = txThisMonth.some((t) => t.recurringId === r.id);
+              const linkedDebt = r.debtId ? debts.find((d) => d.id === r.debtId) : null;
+              return (
+                <div key={r.id} style={{
+                  background: isPaid ? `${C.income}18` : C.card, border: `1px solid ${isPaid ? C.income : C.border}`,
+                  borderRadius: 14, padding: "11px 14px", display: "flex", alignItems: "center", gap: 10, transition: "background .2s, border-color .2s",
+                }}>
+                  <Icon size={15} color={info.color} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, display: "block" }}>{r.name}</span>
+                    <span className="gl-sans" style={{ fontSize: 11, color: C.muted, display: "flex", alignItems: "center", gap: 4 }}>
+                      <CalendarClock size={10} /> le {r.day} de chaque mois {isPaid && `· payé ce mois`}
+                    </span>
+                    {linkedDebt && (
+                      <span className="gl-sans" style={{ fontSize: 10.5, color: C.dette, display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                        <Landmark size={10} /> {linkedDebt.name} · reste {money(linkedDebt.remaining, settings.currency)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="gl-mono" style={{ fontSize: 13, color: r.kind === "revenu" ? C.income : C.expense }}>
+                    {r.kind === "revenu" ? "+" : "−"}{money(r.amount, settings.currency)}
+                  </span>
+                  <button
+                    onClick={() => toggleRecurringPaid(r)}
+                    title={isPaid ? "Annuler le paiement" : "Marquer payé ce mois"}
+                    style={{
+                      background: isPaid ? C.income : C.paper, border: `1px solid ${isPaid ? C.income : C.border}`,
+                      borderRadius: 8, padding: "6px 7px", transition: "background .2s, border-color .2s",
+                    }}
+                  >
+                    <Check size={13} color={isPaid ? "#FBF9F3" : C.income} />
+                  </button>
+                  <button onClick={() => deleteItem("recurring", r.id)}><Trash2 size={13} color={C.muted} /></button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* transactions */}
+        <div style={{ margin: "0 20px 10px" }}>
+          <SectionHeader title="Transactions" />
+          {recentTx.length === 0 && <Empty text="Aucune transaction ce mois-ci. Touchez le bouton + pour en ajouter une." />}
+          <div>
+            {recentTx.map((t, i) => {
+              const info = catInfo(t.category, t.kind);
+              const Icon = info.icon;
+              const confirming = confirmDeleteId === t.id;
+              return (
+                <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 2px", borderBottom: i < recentTx.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 9, background: C.card, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon size={14} color={info.color} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span className="gl-sans" style={{ fontSize: 13.5, fontWeight: 600, color: C.ink, display: "block" }}>
+                      {t.note || info.label}
+                    </span>
+                    <span className="gl-sans" style={{ fontSize: 11, color: C.muted }}>
+                      {new Date(t.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                    </span>
+                  </div>
+                  {confirming ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => deleteItem("tx", t.id)} className="gl-sans" style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: C.expense, border: "none", borderRadius: 7, padding: "5px 8px" }}>Suppr.</button>
+                      <button onClick={() => setConfirmDeleteId(null)} className="gl-sans" style={{ fontSize: 11, fontWeight: 600, color: C.inkSoft, background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 8px" }}>Annuler</button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="gl-mono" style={{ fontSize: 13.5, color: t.kind === "revenu" ? C.income : C.expense, fontWeight: 600 }}>
+                        {t.kind === "revenu" ? "+" : "−"}{money(t.amount, settings.currency)}
+                      </span>
+                      <button onClick={() => setConfirmDeleteId(t.id)} style={{ padding: 2 }}><Trash2 size={13} color={C.muted} /></button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        </>
+        )}
+
+        {/* FAB */}
+        {tab !== "patrimoine" && !lockedNow && (
+        <button
+          onClick={() => openModal("transaction")}
+          style={{
+            position: "fixed", right: "50%", transform: "translateX(calc(220px - 76px))", bottom: 92,
+            width: 54, height: 54, borderRadius: "50%", background: C.gold, border: "none",
+            boxShadow: "0 6px 16px rgba(165,119,43,0.4)", display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 20,
+          }}
+        >
+          <Plus size={24} color="#fff" strokeWidth={2.5} />
+        </button>
+        )}
+
+        {/* bottom nav */}
+        <div style={{
+          position: "fixed", left: "50%", transform: "translateX(-50%)", bottom: 0, width: "100%", maxWidth: 440,
+          background: "#FBF9F3", borderTop: `1px solid ${C.border}`, display: "flex",
+          padding: "10px 12px calc(10px + env(safe-area-inset-bottom))", zIndex: 20,
+        }}>
+          {[
+            { key: "foyer", label: settings.foyerName, iconComp: Home, color: C.foyer },
+            { key: "person1", label: settings.person1 },
+            { key: "person2", label: settings.person2 },
+            { key: "patrimoine", label: "Projets", iconComp: Gem, color: C.patrimoine },
+          ].map((it) => {
+            const active = tab === it.key;
+            return (
+              <button key={it.key} onClick={() => setTab(it.key)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", padding: "4px 2px" }}>
+                {it.iconComp ? (
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: active ? it.color : "transparent", border: `1.5px solid ${active ? it.color : C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <it.iconComp size={13} color={active ? "#fff" : C.muted} />
+                  </div>
+                ) : (
+                  <div style={{ opacity: active ? 1 : 0.45 }}><Avatar label={it.label} color={C[it.key]} size={26} /></div>
+                )}
+                <span className="gl-sans" style={{ fontSize: 10.5, fontWeight: 600, color: active ? C.ink : C.muted, maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {it.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        </>
+        )}
+
+        {/* page : menu des années */}
+        {view === "year-select" && (
+          <div style={{ padding: "18px 20px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+              <button onClick={() => setView("main")} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 8 }}>
+                <ChevronLeft size={17} color={C.inkSoft} />
+              </button>
+              <div>
+                <h1 className="gl-serif" style={{ fontSize: 19, fontWeight: 700, color: C.ink, margin: 0 }}>Résumé annuel</h1>
+                <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "2px 0 0" }}>{scopeName(tab)}</p>
+              </div>
+            </div>
+            <p className="gl-sans" style={{ fontSize: 12.5, color: C.muted, margin: "0 0 14px" }}>Choisissez une année</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {YEARS.map((y) => (
+                <button
+                  key={y}
+                  onClick={() => { setSelectedYear(y); setView("year-detail"); }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 18px" }}
+                >
+                  <span className="gl-serif" style={{ fontSize: 22, fontWeight: 600, color: C.ink }}>{y}</span>
+                  <ChevronRight size={18} color={C.muted} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* page : détail d'une année */}
+        {view === "year-detail" && (
+          <div style={{ padding: "18px 20px 40px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <button onClick={() => setView("year-select")} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 8 }}>
+                <ChevronLeft size={17} color={C.inkSoft} />
+              </button>
+              <div>
+                <h1 className="gl-serif" style={{ fontSize: 19, fontWeight: 700, color: C.ink, margin: 0 }}>{selectedYear}</h1>
+                <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "2px 0 0" }}>{scopeName(tab)} · résumé annuel</p>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 22 }}>
+              {[
+                { label: "Revenus", value: yearData.totals.rev, color: C.income },
+                { label: "Charges", value: yearData.totals.charges, color: C.charges },
+                { label: "Dépenses", value: yearData.totals.dep, color: C.expense },
+                { label: "Épargne", value: yearData.totals.sav, color: C.epargne },
+              ].map((s) => (
+                <div key={s.label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px" }}>
+                  <p className="gl-sans" style={{ fontSize: 11, color: C.muted, margin: "0 0 4px" }}>{s.label}</p>
+                  <p className="gl-mono" style={{ fontSize: 16, fontWeight: 600, color: s.color, margin: 0 }}>{money(s.value, settings.currency)}</p>
+                </div>
+              ))}
+            </div>
+
+            {!yearData.hasData ? (
+              <Empty text={`Aucune donnée pour ${selectedYear}. Les graphiques se rempliront au fil de vos saisies.`} />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                <div>
+                  <p className="gl-sans" style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: "0 0 8px" }}>Solde & épargne cumulée</p>
+                  <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 8px 6px", width: "100%", height: 160 }}>
+                    <ChartCanvas
+                      type="bar"
+                      data={{
+                        labels: yearData.monthly.map((m) => m.label),
+                        datasets: [
+                          { type: "bar", label: "Solde du mois", data: yearData.monthly.map((m) => m.Solde), backgroundColor: C.ink, borderRadius: 3, maxBarThickness: 10 },
+                          { type: "line", label: "Épargne cumulée", data: yearData.monthly.map((m) => m["Épargne cumulée"]), borderColor: C.epargne, backgroundColor: C.epargne, tension: 0.3, pointRadius: 2.5, borderWidth: 2 },
+                        ],
+                      }}
+                      options={chartOptions(settings.currency)}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+                    <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted, display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: C.ink, display: "inline-block" }} /> Solde du mois
+                    </span>
+                    <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted, display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 5, background: C.epargne, display: "inline-block" }} /> Épargne cumulée
+                    </span>
+                  </div>
+                </div>
+
+                {yearData.categoryBreakdown.length > 0 && (
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: "0 0 8px" }}>Répartition des dépenses</p>
+                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 8px", width: "100%", height: 200 }}>
+                      <ChartCanvas
+                        type="doughnut"
+                        data={{
+                          labels: yearData.categoryBreakdown.map((c) => c.name),
+                          datasets: [{ data: yearData.categoryBreakdown.map((c) => c.value), backgroundColor: yearData.categoryBreakdown.map((c) => c.color), borderWidth: 0 }],
+                        }}
+                        options={{ ...pieOptions(settings.currency), cutout: "55%" }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                      {yearData.categoryBreakdown.map((c) => {
+                        const total = yearData.categoryBreakdown.reduce((a, x) => a + x.value, 0);
+                        const pct = total > 0 ? (c.value / total) * 100 : 0;
+                        return (
+                          <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ width: 9, height: 9, borderRadius: 3, background: c.color, display: "inline-block", flexShrink: 0 }} />
+                            <span className="gl-sans" style={{ fontSize: 12, color: C.inkSoft, flex: 1 }}>{c.name}</span>
+                            <span className="gl-mono" style={{ fontSize: 12, color: C.muted }}>{pct.toFixed(0)}%</span>
+                            <span className="gl-mono" style={{ fontSize: 12, color: C.ink, minWidth: 66, textAlign: "right" }}>{money(c.value, settings.currency)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {[
+                  { key: "Revenus", color: C.income },
+                  { key: "Charges", color: C.charges },
+                  { key: "Dépenses", color: C.expense },
+                  { key: "Épargne", color: C.epargne },
+                ].map((series) => (
+                  <div key={series.key}>
+                    <p className="gl-sans" style={{ fontSize: 13, fontWeight: 600, color: C.ink, margin: "0 0 8px" }}>{series.key}</p>
+                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 8px 6px", width: "100%", height: 130 }}>
+                      <ChartCanvas
+                        type="bar"
+                        data={{
+                          labels: yearData.monthly.map((m) => m.label),
+                          datasets: [{ data: yearData.monthly.map((m) => m[series.key]), backgroundColor: series.color, borderRadius: 3, maxBarThickness: 14 }],
+                        }}
+                        options={chartOptions(settings.currency)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* patrimoine : détail d'un projet */}
+        {view === "patrimoine-detail" && (() => {
+          const proj = patrimoine.find((p) => p.id === selectedPatrimoineId);
+          if (!proj) return null;
+          const entries = patrimoineEntries.filter((e) => e.projectId === proj.id).sort((a, b) => a.month.localeCompare(b.month));
+          const chartData = entries.map((e) => ({ label: monthLabel(e.month).slice(0, 3), P1: e.person1, P2: e.person2, Total: e.person1 + e.person2 }));
+          const last = entries[entries.length - 1];
+          const total = last ? last.person1 + last.person2 : 0;
+          const pct = proj.target > 0 ? Math.min(100, (total / proj.target) * 100) : null;
+          return (
+            <div style={{ padding: "18px 20px 40px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                <button onClick={() => setView("main")} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 8 }}>
+                  <ChevronLeft size={17} color={C.inkSoft} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h1 className="gl-serif" style={{ fontSize: 19, fontWeight: 700, color: C.ink, margin: 0 }}>{proj.name}</h1>
+                  <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "2px 0 0" }}>Projet · saisie manuelle</p>
+                </div>
+                <button onClick={() => deleteItem("patrimoine-project", proj.id)}><Trash2 size={15} color={C.muted} /></button>
+              </div>
+
+              <div style={{ background: C.ink, borderRadius: 18, padding: "20px", marginBottom: 22 }}>
+                <p className="gl-sans" style={{ fontSize: 12, color: "#B9C2B4", margin: "0 0 6px" }}>Solde actuel</p>
+                <p className="gl-serif" style={{ fontSize: 30, fontWeight: 600, color: "#FBF9F3", margin: 0 }}>{money(total, settings.currency)}</p>
+                {pct !== null && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ height: 6, borderRadius: 4, background: "#3A4536", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: C.patrimoine, borderRadius: 4, transition: "width .4s" }} />
+                    </div>
+                    <p className="gl-sans" style={{ fontSize: 11.5, color: "#B9C2B4", margin: "6px 0 0" }}>{pct.toFixed(0)}% de {money(proj.target, settings.currency)}</p>
+                  </div>
+                )}
+              </div>
+
+              <SectionHeader title="Historique mensuel" onAdd={() => openModal("patrimoine-entry", { month: todayYM() })} addLabel="Ce mois-ci" />
+
+              {entries.length === 0 ? (
+                <Empty text="Aucune saisie pour l'instant. Ajoutez le solde actuel de chaque livret pour ce mois-ci." />
+              ) : (
+                <>
+                  <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: "12px 8px 6px", width: "100%", height: 170, marginBottom: 8 }}>
+                    <ChartCanvas
+                      type="bar"
+                      data={{
+                        labels: chartData.map((d) => d.label),
+                        datasets: [
+                          { label: settings.person1, data: chartData.map((d) => d.P1), backgroundColor: C.person1, borderRadius: 3, maxBarThickness: 9 },
+                          { label: settings.person2, data: chartData.map((d) => d.P2), backgroundColor: C.person2, borderRadius: 3, maxBarThickness: 9 },
+                          { label: "Total", data: chartData.map((d) => d.Total), backgroundColor: C.patrimoine, borderRadius: 3, maxBarThickness: 9 },
+                        ],
+                      }}
+                      options={chartOptions(settings.currency)}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 14, marginBottom: 20, flexWrap: "wrap" }}>
+                    {[{ label: settings.person1, color: C.person1 }, { label: settings.person2, color: C.person2 }, { label: "Total", color: C.patrimoine }].map((s) => (
+                      <span key={s.label} className="gl-sans" style={{ fontSize: 10.5, color: C.muted, display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block" }} /> {s.label}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", padding: "0 4px 6px", borderBottom: `1px solid ${C.border}` }}>
+                      <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted, flex: 1.3, fontWeight: 600 }}>Mois</span>
+                      <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted, flex: 1, textAlign: "right", fontWeight: 600 }}>{settings.person1}</span>
+                      <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted, flex: 1, textAlign: "right", fontWeight: 600 }}>{settings.person2}</span>
+                      <span className="gl-sans" style={{ fontSize: 10.5, color: C.muted, flex: 1, textAlign: "right", fontWeight: 600 }}>Total</span>
+                      <span style={{ width: 22 }} />
+                    </div>
+                    {[...entries].reverse().map((e) => (
+                      <div key={e.id} onClick={() => openModal("patrimoine-entry", { month: e.month })} style={{ display: "flex", alignItems: "center", padding: "8px 4px", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}>
+                        <span className="gl-sans" style={{ fontSize: 12.5, color: C.ink, flex: 1.3 }}>{monthLabel(e.month)}</span>
+                        <span className="gl-mono" style={{ fontSize: 12, color: C.inkSoft, flex: 1, textAlign: "right" }}>{money(e.person1, settings.currency)}</span>
+                        <span className="gl-mono" style={{ fontSize: 12, color: C.inkSoft, flex: 1, textAlign: "right" }}>{money(e.person2, settings.currency)}</span>
+                        <span className="gl-mono" style={{ fontSize: 12.5, color: C.patrimoine, fontWeight: 600, flex: 1, textAlign: "right" }}>{money(e.person1 + e.person2, settings.currency)}</span>
+                        <button onClick={(ev) => { ev.stopPropagation(); deleteItem("patrimoine-entry", e.id); }} style={{ width: 22, display: "flex", justifyContent: "center" }}>
+                          <Trash2 size={12} color={C.muted} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* modal */}
+        {modal && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 30, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+            <div onClick={closeModal} style={{ position: "absolute", inset: 0, background: "rgba(32,41,31,0.45)" }} />
+            <div className="gl-scroll" style={{
+              position: "relative", width: "100%", maxWidth: 440, maxHeight: "88vh", overflowY: "auto",
+              background: C.paper, borderRadius: "20px 20px 0 0", padding: "18px 20px calc(24px + env(safe-area-inset-bottom))",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <h3 className="gl-serif" style={{ fontSize: 19, fontWeight: 600, color: C.ink, margin: 0 }}>
+                  {modal.type === "transaction" && "Nouvelle transaction"}
+                  {modal.type === "budget" && "Nouveau budget"}
+                  {modal.type === "goal" && "Nouvel objectif"}
+                  {modal.type === "goal-add" && "Ajouter au fonds"}
+                  {modal.type === "recurring" && "Nouvelle charge récurrente"}
+                  {modal.type === "settings" && "Réglages"}
+                  {modal.type === "set-pin" && `Code pour ${scopeName(tab)}`}
+                  {modal.type === "placement" && "Nouveau placement"}
+                  {modal.type === "placement-move" && (draft.direction === "verser" ? "Verser" : "Retirer")}
+                  {modal.type === "debt" && "Nouvelle dette"}
+                  {modal.type === "debt-pay" && "Rembourser"}
+                  {modal.type === "patrimoine-project" && "Nouveau projet"}
+                  {modal.type === "patrimoine-entry" && "Saisie mensuelle"}
+                </h3>
+                <button onClick={closeModal}><X size={19} color={C.muted} /></button>
+              </div>
+
+              {/* --- transaction --- */}
+              {modal.type === "transaction" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <SegButton active={draft.kind === "depense"} activeColor={C.expense} onClick={() => { const d = firstCat(EXPENSE_CATEGORIES); setDraft({ ...draft, kind: "depense", catGroup: d.group, category: d.category, debtId: "" }); }}>Dépense</SegButton>
+                    <SegButton active={draft.kind === "revenu"} activeColor={C.income} onClick={() => { const d = firstCat(INCOME_CATEGORIES); setDraft({ ...draft, kind: "revenu", catGroup: d.group, category: d.category, debtId: "" }); }}>Revenu</SegButton>
+                  </div>
+                  <div>
+                    <input autoFocus type="number" inputMode="decimal" placeholder="0,00" value={draft.amount}
+                      onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 32, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["foyer", "person1", "person2"].map((s) => (
+                      <SegButton key={s} active={draft.scope === s} activeColor={C[s]} onClick={() => setDraft({ ...draft, scope: s, debtId: "" })}>{scopeName(s)}</SegButton>
+                    ))}
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Catégorie</p>
+                    <CategoryPicker list={cats} group={draft.catGroup} category={draft.category} onSelect={(g, c) => setDraft({ ...draft, catGroup: g, category: c, debtId: "" })} />
+                  </div>
+                  {draft.kind === "depense" && debts.filter((d) => d.scope === draft.scope && d.remaining > 0).length > 0 && (
+                    <div>
+                      <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Lier à une dette (optionnel)</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <button onClick={() => setDraft({ ...draft, debtId: "" })} className="gl-sans" style={{
+                          padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          border: `1px solid ${!draft.debtId ? C.dette : C.border}`, background: !draft.debtId ? C.dette + "20" : C.card, color: C.inkSoft,
+                        }}>Aucune</button>
+                        {debts.filter((d) => d.scope === draft.scope && d.remaining > 0).map((d) => (
+                          <button key={d.id} onClick={() => setDraft({ ...draft, debtId: d.id })} className="gl-sans" style={{
+                            padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                            border: `1px solid ${draft.debtId === d.id ? C.dette : C.border}`, background: draft.debtId === d.id ? C.dette + "20" : C.card, color: C.inkSoft,
+                          }}>{d.name} · reste {money(d.remaining, settings.currency)}</button>
+                        ))}
+                      </div>
+                      {draft.debtId && (
+                        <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: "8px 0 0" }}>
+                          Le solde restant dû de cette dette sera automatiquement mis à jour.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  <input type="text" placeholder="Note (optionnel)" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                </div>
+              )}
+
+              {/* --- budget --- */}
+              {modal.type === "budget" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <p className="gl-sans" style={{ fontSize: 12.5, color: C.muted, margin: 0 }}>Pour {scopeName(draft.scope)}</p>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Catégorie</p>
+                    <CategoryPicker list={BUDGET_EXPENSE_CATEGORIES} group={draft.catGroup} category={draft.category} onSelect={(g, c) => setDraft({ ...draft, catGroup: g, category: c })} allowWholeCategory />
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Limite mensuelle</p>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={draft.limit} onChange={(e) => setDraft({ ...draft, limit: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 26, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                </div>
+              )}
+
+              {/* --- goal --- */}
+              {modal.type === "goal" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["foyer", "person1", "person2"].map((s) => (
+                      <SegButton key={s} active={draft.scope === s} activeColor={C[s]} onClick={() => setDraft({ ...draft, scope: s })}>{scopeName(s)}</SegButton>
+                    ))}
+                  </div>
+                  <input type="text" placeholder="Nom de l'objectif (ex. Vacances)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Montant visé</p>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={draft.target} onChange={(e) => setDraft({ ...draft, target: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 26, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Échéance (optionnel)</p>
+                    <input type="date" value={draft.deadline} onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
+                      className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  </div>
+                </div>
+              )}
+
+              {/* --- goal-add --- */}
+              {modal.type === "goal-add" && (
+                <div>
+                  <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Montant à ajouter</p>
+                  <input autoFocus type="number" inputMode="decimal" placeholder="0,00" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                    className="gl-serif" style={{ width: "100%", fontSize: 30, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                </div>
+              )}
+
+              {/* --- recurring --- */}
+              {modal.type === "recurring" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <SegButton active={draft.kind === "depense"} activeColor={C.expense} onClick={() => { const d = firstCat(EXPENSE_CATEGORIES); setDraft({ ...draft, kind: "depense", catGroup: d.group, category: d.category, debtId: "" }); }}>Dépense</SegButton>
+                    <SegButton active={draft.kind === "revenu"} activeColor={C.income} onClick={() => { const d = firstCat(INCOME_CATEGORIES); setDraft({ ...draft, kind: "revenu", catGroup: d.group, category: d.category, debtId: "" }); }}>Revenu</SegButton>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["foyer", "person1", "person2"].map((s) => (
+                      <SegButton key={s} active={draft.scope === s} activeColor={C[s]} onClick={() => setDraft({ ...draft, scope: s, debtId: "" })}>{scopeName(s)}</SegButton>
+                    ))}
+                  </div>
+                  <input type="text" placeholder="Nom (ex. Loyer, Netflix)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Montant</p>
+                      <input type="number" inputMode="decimal" placeholder="0,00" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                        className="gl-serif" style={{ width: "100%", fontSize: 22, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                    </div>
+                    <div style={{ width: 90 }}>
+                      <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Jour</p>
+                      <input type="number" min="1" max="28" value={draft.day} onChange={(e) => setDraft({ ...draft, day: e.target.value })}
+                        className="gl-serif" style={{ width: "100%", fontSize: 22, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Catégorie</p>
+                    <CategoryPicker list={draft.kind === "revenu" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES} group={draft.catGroup} category={draft.category} onSelect={(g, c) => setDraft({ ...draft, catGroup: g, category: c })} />
+                  </div>
+                  {draft.kind === "depense" && debts.filter((d) => d.scope === draft.scope && d.remaining > 0).length > 0 && (
+                    <div>
+                      <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Lier à une dette (optionnel)</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <button onClick={() => setDraft({ ...draft, debtId: "" })} className="gl-sans" style={{
+                          padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          border: `1px solid ${!draft.debtId ? C.dette : C.border}`, background: !draft.debtId ? C.dette + "20" : C.card, color: C.inkSoft,
+                        }}>Aucune</button>
+                        {debts.filter((d) => d.scope === draft.scope && d.remaining > 0).map((d) => (
+                          <button key={d.id} onClick={() => setDraft({ ...draft, debtId: d.id })} className="gl-sans" style={{
+                            padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                            border: `1px solid ${draft.debtId === d.id ? C.dette : C.border}`, background: draft.debtId === d.id ? C.dette + "20" : C.card, color: C.inkSoft,
+                          }}>{d.name} · reste {money(d.remaining, settings.currency)}</button>
+                        ))}
+                      </div>
+                      {draft.debtId && (
+                        <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: "8px 0 0" }}>
+                          Chaque fois que vous marquerez cette charge comme payée, le montant sera automatiquement déduit du capital restant dû de cette dette.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* --- settings --- */}
+              {modal.type === "settings" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Nom du foyer</p>
+                    <input type="text" value={draft.foyerName} onChange={(e) => setDraft({ ...draft, foyerName: e.target.value })}
+                      className="gl-sans" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Personne 1</p>
+                    <input type="text" value={draft.person1} onChange={(e) => setDraft({ ...draft, person1: e.target.value })}
+                      className="gl-sans" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Personne 2</p>
+                    <input type="text" value={draft.person2} onChange={(e) => setDraft({ ...draft, person2: e.target.value })}
+                      className="gl-sans" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Devise</p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {CURRENCIES.map((cur) => (
+                        <SegButton key={cur} active={draft.currency === cur} activeColor={C.gold} onClick={() => setDraft({ ...draft, currency: cur })}>{cur}</SegButton>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                    Ces données sont partagées entre toutes les personnes qui ouvrent cette application — pratique pour vous deux, mais ne partagez pas ce lien en dehors du foyer.
+                  </p>
+                </div>
+              )}
+
+              {/* --- set-pin --- */}
+              {modal.type === "set-pin" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Nouveau code (4 à 6 chiffres)</p>
+                    <input
+                      type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} autoFocus
+                      value={draft.newPin}
+                      onChange={(e) => setDraft({ ...draft, newPin: e.target.value.replace(/\D/g, "") })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 24, letterSpacing: 6, color: C.ink, border: "none", borderBottom: `2px solid ${C.border}`, background: "none", outline: "none", padding: "6px 0" }}
+                    />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Confirmer le code</p>
+                    <input
+                      type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6}
+                      value={draft.confirmPin}
+                      onChange={(e) => setDraft({ ...draft, confirmPin: e.target.value.replace(/\D/g, "") })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 24, letterSpacing: 6, color: C.ink, border: "none", borderBottom: `2px solid ${C.border}`, background: "none", outline: "none", padding: "6px 0" }}
+                    />
+                  </div>
+                  {draft.confirmPin && draft.newPin !== draft.confirmPin && (
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.expense, margin: 0 }}>Les codes ne correspondent pas.</p>
+                  )}
+                  <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                    Ce code masque simplement cet espace à l'écran ; ce n'est pas un chiffrement fort des données.
+                  </p>
+                </div>
+              )}
+
+              {/* --- placement --- */}
+              {modal.type === "placement" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["foyer", "person1", "person2"].map((s) => (
+                      <SegButton key={s} active={draft.scope === s} activeColor={C[s]} onClick={() => setDraft({ ...draft, scope: s })}>{scopeName(s)}</SegButton>
+                    ))}
+                  </div>
+                  <input autoFocus type="text" placeholder="Nom (ex. Livret A, PEA, Assurance vie)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Solde actuel (optionnel)</p>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={draft.initialBalance} onChange={(e) => setDraft({ ...draft, initialBalance: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 26, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                    Si vous avez déjà de l'argent placé, indiquez-le ici : ce montant de départ ne sera pas compté comme une dépense du mois. Seuls les versements et retraits futurs le seront.
+                  </p>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Lier à un objectif d'épargne (optionnel)</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <button onClick={() => setDraft({ ...draft, goalId: "" })} className="gl-sans" style={{
+                        padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                        border: `1px solid ${!draft.goalId ? C.epargne : C.border}`, background: !draft.goalId ? C.epargne + "20" : C.card, color: C.inkSoft,
+                      }}>Aucun</button>
+                      {goals.filter((g) => g.scope === draft.scope).map((g) => (
+                        <button key={g.id} onClick={() => setDraft({ ...draft, goalId: g.id })} className="gl-sans" style={{
+                          padding: "7px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                          border: `1px solid ${draft.goalId === g.id ? C.epargne : C.border}`, background: draft.goalId === g.id ? C.epargne + "20" : C.card, color: C.inkSoft,
+                        }}>{g.name}</button>
+                      ))}
+                    </div>
+                    {goals.filter((g) => g.scope === draft.scope).length === 0 && (
+                      <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, margin: "8px 0 0" }}>
+                        Aucun objectif pour {scopeName(draft.scope)} pour l'instant — créez-en un depuis la section Objectifs.
+                      </p>
+                    )}
+                    {draft.goalId && (
+                      <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: "8px 0 0" }}>
+                        Chaque versement ou retrait sur ce placement fera avancer ou reculer la jauge de cet objectif. Le solde actuel indiqué ci-dessus n'y sera pas ajouté.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* --- placement-move --- */}
+              {modal.type === "placement-move" && (() => {
+                const placement = placements.find((p) => p.id === draft.placementId);
+                const linkedGoal = placement && goals.find((g) => g.id === placement.goalId);
+                const tooMuch = draft.direction === "retirer" && placement && parseFloat(String(draft.amount).replace(",", ".")) > placement.balance;
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <p className="gl-sans" style={{ fontSize: 12.5, color: C.muted, margin: 0 }}>
+                      {placement?.name} · solde actuel {money(placement?.balance || 0, settings.currency)}
+                    </p>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <SegButton active={draft.direction === "verser"} activeColor={C.income} onClick={() => setDraft({ ...draft, direction: "verser" })}>Verser</SegButton>
+                      <SegButton active={draft.direction === "retirer"} activeColor={C.expense} onClick={() => setDraft({ ...draft, direction: "retirer" })}>Retirer</SegButton>
+                    </div>
+                    <input autoFocus type="number" inputMode="decimal" placeholder="0,00" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 30, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                    {tooMuch && <p className="gl-sans" style={{ fontSize: 12, color: C.expense, margin: 0 }}>Le solde du placement est insuffisant.</p>}
+                    <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                      {draft.direction === "verser"
+                        ? "Ce versement sera compté comme une dépense du mois."
+                        : "Ce retrait sera compté comme un revenu du mois."}
+                      {linkedGoal && ` La jauge de l'objectif « ${linkedGoal.name} » sera mise à jour en conséquence.`}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* --- debt --- */}
+              {modal.type === "debt" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {["foyer", "person1", "person2"].map((s) => (
+                      <SegButton key={s} active={draft.scope === s} activeColor={C[s]} onClick={() => setDraft({ ...draft, scope: s })}>{scopeName(s)}</SegButton>
+                    ))}
+                  </div>
+                  <input autoFocus type="text" placeholder="Nom (ex. Prêt voiture, Crédit études)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Montant emprunté (capital total)</p>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={draft.principal} onChange={(e) => setDraft({ ...draft, principal: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 26, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Reste à rembourser actuellement (optionnel)</p>
+                    <input type="number" inputMode="decimal" placeholder="= montant emprunté si vide" value={draft.remaining} onChange={(e) => setDraft({ ...draft, remaining: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 20, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 8px" }}>Catégorie des remboursements</p>
+                    <CategoryPicker list={BUDGET_EXPENSE_CATEGORIES} group={draft.catGroup} category={draft.category} onSelect={(g, c) => setDraft({ ...draft, catGroup: g, category: c })} />
+                  </div>
+                </div>
+              )}
+
+              {/* --- debt-pay --- */}
+              {modal.type === "debt-pay" && (() => {
+                const debt = debts.find((d) => d.id === draft.debtId);
+                const tooMuch = debt && parseFloat(String(draft.amount).replace(",", ".")) > debt.remaining;
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <p className="gl-sans" style={{ fontSize: 12.5, color: C.muted, margin: 0 }}>
+                      {debt?.name} · reste dû {money(debt?.remaining || 0, settings.currency)}
+                    </p>
+                    <input autoFocus type="number" inputMode="decimal" placeholder="0,00" value={draft.amount} onChange={(e) => setDraft({ ...draft, amount: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 30, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                    {tooMuch && <p className="gl-sans" style={{ fontSize: 12, color: C.expense, margin: 0 }}>Ce montant dépasse le capital restant dû.</p>}
+                    <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                      Ce remboursement sera compté comme une dépense du mois, dans la catégorie associée à cette dette.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* --- patrimoine-project --- */}
+              {modal.type === "patrimoine-project" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <input autoFocus type="text" placeholder="Nom (ex. Projet immobilier, Voyage)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Montant visé (optionnel)</p>
+                    <input type="number" inputMode="decimal" placeholder="ex. 30000 pour un apport" value={draft.target} onChange={(e) => setDraft({ ...draft, target: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 22, fontWeight: 600, color: C.ink, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                    Ce projet est entièrement saisi à la main, mois après mois — indépendant du reste de l'appli.
+                  </p>
+                </div>
+              )}
+
+              {/* --- patrimoine-entry --- */}
+              {modal.type === "patrimoine-entry" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Mois</p>
+                    <input type="month" value={draft.month} onChange={(e) => setDraft({ ...draft, month: e.target.value })}
+                      className="gl-sans" style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.card, fontSize: 13.5, color: C.ink }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Solde {settings.person1}</p>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={draft.person1} onChange={(e) => setDraft({ ...draft, person1: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 22, fontWeight: 600, color: C.person1, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <div>
+                    <p className="gl-sans" style={{ fontSize: 12, color: C.muted, margin: "0 0 6px" }}>Solde {settings.person2}</p>
+                    <input type="number" inputMode="decimal" placeholder="0,00" value={draft.person2} onChange={(e) => setDraft({ ...draft, person2: e.target.value })}
+                      className="gl-serif" style={{ width: "100%", fontSize: 22, fontWeight: 600, color: C.person2, border: "none", background: "none", outline: "none" }} />
+                  </div>
+                  <p className="gl-sans" style={{ fontSize: 11.5, color: C.muted, lineHeight: 1.5, margin: 0 }}>
+                    Une saisie déjà existante pour ce mois sera remplacée par celle-ci.
+                  </p>
+                </div>
+              )}
+
+              {formError && (
+                <p className="gl-sans" style={{ fontSize: 12.5, color: C.expense, background: "#A34C3618", border: `1px solid ${C.expense}`, borderRadius: 10, padding: "9px 12px", margin: "16px 0 0" }}>
+                  {formError}
+                </p>
+              )}
+
+              <button onClick={submitModal} className="gl-sans" style={{
+                width: "100%", marginTop: 12, padding: "13px", borderRadius: 12, border: "none",
+                background: C.ink, color: "#FBF9F3", fontSize: 14.5, fontWeight: 600,
+              }}>
+                {modal.type === "goal-add" && "Ajouter"}
+                {modal.type === "placement-move" && (draft.direction === "verser" ? "Verser" : "Retirer")}
+                {modal.type === "debt-pay" && "Rembourser"}
+                {modal.type !== "goal-add" && modal.type !== "placement-move" && modal.type !== "debt-pay" && "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const rootEl = document.getElementById("root");
+ReactDOM.createRoot(rootEl).render(<App />);
+</script>
+</body>
+</html>
